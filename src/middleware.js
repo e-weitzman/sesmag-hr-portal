@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server'
 import { verifyToken, COOKIE_NAME } from '@/lib/auth-edge'
 
-const PROTECTED_PATHS = ['/dashboard', '/profile', '/team', '/chat', '/accessibility', '/admin']
+const PROTECTED_PATHS = ['/dashboard', '/profile', '/team', '/chat', '/accessibility', '/admin', '/logs']
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl
@@ -32,5 +32,5 @@ export async function middleware(request) {
 
 export const config = {
   matcher: ['/dashboard/:path*', '/profile/:path*', '/team/:path*',
-            '/chat/:path*', '/accessibility/:path*', '/admin/:path*'],
+            '/chat/:path*', '/accessibility/:path*', '/admin/:path*', '/logs/:path*'],
 }

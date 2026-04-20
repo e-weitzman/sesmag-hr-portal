@@ -10,7 +10,8 @@ const NAV = [
   { href: '/team',          icon: '◈', label: 'Team Directory',   roles: ['manager','admin'] },
   { href: '/chat',          icon: '✦', label: 'AI Assistant',     roles: ['employee','manager','admin'] },
   { href: '/accessibility', icon: '♿', label: 'Accessibility',    roles: ['employee','manager','admin'] },
-  { href: '/admin',         icon: '⚙', label: 'Admin Panel',      roles: ['admin'] },
+  { href: '/logs',          icon: '◎', label: 'Logs & Admin',      roles: ['manager','admin'] },
+  { href: '/admin',         icon: '⚙', label: 'Admin Panel',       roles: ['admin'] },
 ]
 
 export default function AppShell({ children }) {

@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { query } from '@/lib/db'
 import { signToken, setAuthCookie, clearAuthCookie, requireAuth } from '@/lib/auth'
+import { logAuth, getRequestInfo } from '@/lib/logger'
 
-function serverError(err) {
+const serverError = (err) => {
   console.error('[auth]', err)
   return NextResponse.json({ error: 'Internal server error', detail: err.message }, { status: 500 })
 }
@@ -17,16 +18,13 @@ export async function POST(request) {
     if (action === 'logout')   return await handleLogout(request)
     if (action === 'register') return await handleRegister(request)
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
-  } catch (err) {
-    return serverError(err)
-  }
+  } catch (err) { return serverError(err) }
 }
 
 export async function GET(request) {
   try {
     const { user, error } = await requireAuth(request)
     if (error) return error
-
     const rows = await query(
       `SELECT id, username, email, role, first_name, last_name, pronouns,
               department, job_title, hire_date, bio, phone,
@@ -37,12 +35,11 @@ export async function GET(request) {
     )
     if (!rows.length) return NextResponse.json({ error: 'User not found' }, { status: 404 })
     return NextResponse.json({ user: rows[0] })
-  } catch (err) {
-    return serverError(err)
-  }
+  } catch (err) { return serverError(err) }
 }
 
 async function handleLogin(request) {
+  const { ip, path } = getRequestInfo(request)
   const body = await request.json().catch(() => ({}))
   const { username, password } = body
 
@@ -61,26 +58,34 @@ async function handleLogin(request) {
 
   const user = rows[0]
   if (!user || !user.is_active) {
+    await logAuth('login_failed', { username, ip, path, success: false, message: 'User not found or inactive' })
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }
 
   const valid = await bcrypt.compare(password, user.password_hash)
   if (!valid) {
+    await logAuth('login_failed', { username, ip, path, success: false, message: 'Wrong password' })
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }
 
   const token = await signToken({ sub: user.id, role: user.role, username: user.username })
+  await logAuth('login_success', { userId: user.id, username, ip, path, success: true })
+
   const { password_hash, ...safeUser } = user
   const response = NextResponse.json({ user: safeUser })
   return setAuthCookie(response, token)
 }
 
 async function handleLogout(request) {
+  const { ip, path } = getRequestInfo(request)
+  const { user } = await requireAuth(request).catch(() => ({ user: null }))
+  await logAuth('logout', { userId: user?.sub, username: user?.username, ip, path, success: true })
   const response = NextResponse.json({ message: 'Logged out' })
   return clearAuthCookie(response)
 }
 
 async function handleRegister(request) {
+  const { ip, path } = getRequestInfo(request)
   const body = await request.json().catch(() => ({}))
   const { username, email, password, first_name, last_name, role = 'employee' } = body
 
@@ -99,9 +104,11 @@ async function handleRegister(request) {
        RETURNING id, username, email, role, first_name, last_name`,
       [username, email, hash, first_name, last_name, role]
     )
+    await logAuth('register_success', { userId: rows[0].id, username, ip, path, success: true })
     return NextResponse.json({ user: rows[0] }, { status: 201 })
   } catch (err) {
     if (err.code === '23505') {
+      await logAuth('register_failed', { username, ip, path, success: false, message: 'Duplicate username/email' })
       return NextResponse.json({ error: 'Username or email already exists' }, { status: 409 })
     }
     throw err

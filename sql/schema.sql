@@ -125,3 +125,27 @@ ON CONFLICT (username) DO NOTHING;
 -- Set manager relationships
 UPDATE users SET manager_id = 'u-mgr-001'
 WHERE username IN ('dav_persona','tim_c','abi_k','gary_w');
+
+-- ── SYSTEM LOGS ───────────────────────────────────────────────
+-- Run this block in Neon SQL Editor to add logging support
+CREATE TABLE IF NOT EXISTS system_logs (
+  id          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  level       VARCHAR(10)  NOT NULL CHECK (level IN ('info','warn','error','debug')),
+  category    VARCHAR(50)  NOT NULL, -- 'auth', 'user', 'api', 'db', 'middleware'
+  action      VARCHAR(100) NOT NULL, -- e.g. 'login_success', 'profile_update'
+  user_id     TEXT REFERENCES users(id) ON DELETE SET NULL,
+  username    VARCHAR(60),
+  ip          VARCHAR(60),
+  path        VARCHAR(255),
+  method      VARCHAR(10),
+  status_code INT,
+  message     TEXT,
+  metadata    JSONB,
+  duration_ms INT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_logs_created  ON system_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_logs_level    ON system_logs(level);
+CREATE INDEX IF NOT EXISTS idx_logs_category ON system_logs(category);
+CREATE INDEX IF NOT EXISTS idx_logs_user     ON system_logs(user_id);
