@@ -1,5 +1,6 @@
 /* globals.css — SESMag HR Portal */
-/* Aesthetic: warm editorial — cream paper, ink-dark type, amber accents, editorial spacing */
+/* Aesthetic: warm editorial — cream paper, ink-dark type, amber accents */
+/* Fonts: loaded at browser runtime via @import, system fallbacks always apply */
 
 @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&family=Epilogue:wght@300;400;500;600;700;800&display=swap');
 

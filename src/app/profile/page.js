@@ -1,12 +1,13 @@
 'use client'
 // src/app/profile/page.js
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import AppShell from '@/components/AppShell'
 import { Avatar, RoleBadge, Badge, Alert } from '@/components/ui'
 
-export default function ProfilePage() {
+// useSearchParams() MUST live inside a Suspense boundary — isolated here
+function ProfileContent() {
   const { user, loading, updateUser } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -32,8 +33,8 @@ export default function ProfilePage() {
   }, [user, targetId])
 
   useEffect(() => {
-    if (!profile) return
-    const isManager = user?.role === 'manager' || user?.role === 'admin'
+    if (!profile || !user) return
+    const isManager = user.role === 'manager' || user.role === 'admin'
     if (isManager) {
       fetch(`/api/users/${profile.id}/changes`)
         .then(r => r.json())
@@ -87,11 +88,8 @@ export default function ProfilePage() {
         {isSelf ? 'My Profile' : `${profile.first_name} ${profile.last_name}`}
       </h1>
 
-      {alert && (
-        <Alert type={alert.type} className="mb-4">{alert.msg}</Alert>
-      )}
+      {alert && <Alert type={alert.type}>{alert.msg}</Alert>}
 
-      {/* Profile header */}
       <div className="card" style={{ marginBottom: '1.25rem' }}>
         <div className="profile-header">
           <Avatar user={profile} size="avatar-lg" />
@@ -100,7 +98,9 @@ export default function ProfilePage() {
             {profile.pronouns && (
               <div style={{ color: 'var(--text3)', fontSize: '0.82em' }}>{profile.pronouns}</div>
             )}
-            <div className="profile-role">{profile.job_title} {profile.department ? `· ${profile.department}` : ''}</div>
+            <div className="profile-role">
+              {profile.job_title}{profile.department ? ` · ${profile.department}` : ''}
+            </div>
             <div style={{ marginTop: '0.6rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <RoleBadge role={profile.role} />
               {profile.is_active ? <Badge type="green">Active</Badge> : <Badge type="red">Inactive</Badge>}
@@ -114,7 +114,9 @@ export default function ProfilePage() {
                   <button className="btn btn-primary btn-sm" onClick={saveProfile} disabled={saving}>
                     {saving ? 'Saving…' : 'Save Changes'}
                   </button>
-                  <button className="btn btn-secondary btn-sm" onClick={() => setEditing(false)}>Cancel</button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setEditing(false)}>
+                    Cancel
+                  </button>
                 </>
               ) : (
                 <button className="btn btn-secondary btn-sm" onClick={startEdit}>Edit Profile</button>
@@ -123,16 +125,15 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Edit form */}
         {editing ? (
           <div className="grid-2" style={{ marginTop: '1.5rem' }}>
             {[
               ['first_name', 'First Name', 'text'],
-              ['last_name', 'Last Name', 'text'],
-              ['pronouns', 'Pronouns', 'text'],
-              ['phone', 'Phone', 'tel'],
+              ['last_name',  'Last Name',  'text'],
+              ['pronouns',   'Pronouns',   'text'],
+              ['phone',      'Phone',      'tel'],
               ['department', 'Department', 'text'],
-              ['job_title', 'Job Title', 'text'],
+              ['job_title',  'Job Title',  'text'],
             ].map(([key, label, type]) => (
               <div className="form-group" key={key}>
                 <label className="form-label" htmlFor={`field-${key}`}>{label}</label>
@@ -146,44 +147,49 @@ export default function ProfilePage() {
             <div className="form-group" style={{ gridColumn: '1 / -1' }}>
               <label className="form-label" htmlFor="field-bio">
                 Bio{' '}
-                <span style={{ color: 'var(--accent)', fontSize: '0.85em', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                <span style={{ color: 'var(--accent)', fontSize: '0.85em', fontWeight: 400,
+                  textTransform: 'none', letterSpacing: 0 }}>
                   ✦ AI will professionally polish this on save
                 </span>
               </label>
               <textarea
-                id="field-bio" className="form-input" rows={3} style={{ resize: 'vertical' }}
+                id="field-bio" className="form-input" rows={3}
+                style={{ resize: 'vertical' }}
                 value={form.bio || ''}
                 onChange={e => setForm(p => ({ ...p, bio: e.target.value }))}
               />
             </div>
           </div>
         ) : (
-          /* Read-only view */
           <div className="grid-2" style={{ marginTop: '1.5rem' }}>
             {[
-              ['Email', profile.email],
-              ['Phone', profile.phone || '—'],
-              ['Hire Date', profile.hire_date ? new Date(profile.hire_date).toLocaleDateString() : '—'],
-              ['Manager', profile.manager_name || '—'],
-              ['Tech Comfort', '★'.repeat(profile.tech_comfort_level) + '☆'.repeat(5 - profile.tech_comfort_level)],
-              ['Theme', profile.color_theme],
+              ['Email',       profile.email],
+              ['Phone',       profile.phone || '—'],
+              ['Hire Date',   profile.hire_date ? new Date(profile.hire_date).toLocaleDateString() : '—'],
+              ['Manager',     profile.manager_name || '—'],
+              ['Tech Comfort','★'.repeat(profile.tech_comfort_level) + '☆'.repeat(5 - profile.tech_comfort_level)],
+              ['Theme',       profile.color_theme],
             ].map(([k, v]) => (
               <div key={k} style={{ paddingBottom: '0.6rem', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '0.72em', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{k}</div>
+                <div style={{ fontSize: '0.72em', color: 'var(--text3)',
+                  textTransform: 'uppercase', letterSpacing: '0.07em' }}>{k}</div>
                 <div style={{ marginTop: '0.2rem', fontWeight: 500 }}>{v}</div>
               </div>
             ))}
             {profile.bio && (
-              <div style={{ gridColumn: '1 / -1', paddingBottom: '0.6rem', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '0.72em', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Bio</div>
-                <div style={{ marginTop: '0.3rem', color: 'var(--text2)', lineHeight: 1.7 }}>{profile.bio}</div>
+              <div style={{ gridColumn: '1 / -1', paddingBottom: '0.6rem',
+                borderBottom: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '0.72em', color: 'var(--text3)',
+                  textTransform: 'uppercase', letterSpacing: '0.07em' }}>Bio</div>
+                <div style={{ marginTop: '0.3rem', color: 'var(--text2)', lineHeight: 1.7 }}>
+                  {profile.bio}
+                </div>
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Change log (managers/admins only) */}
       {changes.length > 0 && (
         <div className="card">
           <p className="card-title">⟳ Profile Change Log</p>
@@ -194,7 +200,8 @@ export default function ProfilePage() {
                 borderBottom: '1px solid var(--border)', fontSize: '0.88em',
               }}>
                 <div style={{ flex: 1 }}>
-                  <span style={{ fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{c.field_name}</span>
+                  <span style={{ fontWeight: 700, color: 'var(--accent)',
+                    fontFamily: 'var(--font-mono)' }}>{c.field_name}</span>
                   <span style={{ color: 'var(--text3)' }}> → </span>
                   <span style={{ color: 'var(--green)', fontWeight: 600 }}>{c.new_value}</span>
                   <span style={{ color: 'var(--text3)' }}> (was: {c.old_value})</span>
@@ -208,5 +215,13 @@ export default function ProfilePage() {
         </div>
       )}
     </AppShell>
+  )
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={null}>
+      <ProfileContent />
+    </Suspense>
   )
 }
