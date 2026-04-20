@@ -36,8 +36,13 @@ export function AuthProvider({ children }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Login failed')
+    let data
+    try {
+      data = await res.json()
+    } catch {
+      throw new Error(`Server error (${res.status}) — check Vercel logs`)
+    }
+    if (!res.ok) throw new Error(data.error || `Login failed (${res.status})`)
     setUser(data.user)
     applyPrefs(data.user)
     return data.user

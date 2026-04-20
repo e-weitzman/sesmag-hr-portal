@@ -4,34 +4,42 @@ import bcrypt from 'bcryptjs'
 import { query } from '@/lib/db'
 import { signToken, setAuthCookie, clearAuthCookie, requireAuth } from '@/lib/auth'
 
-// POST /api/auth?action=login|logout|register|me
-export async function POST(request) {
-  const { searchParams } = new URL(request.url)
-  const action = searchParams.get('action')
+function serverError(err) {
+  console.error('[auth]', err)
+  return NextResponse.json({ error: 'Internal server error', detail: err.message }, { status: 500 })
+}
 
-  if (action === 'login') return handleLogin(request)
-  if (action === 'logout') return handleLogout(request)
-  if (action === 'register') return handleRegister(request)
-  return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
+export async function POST(request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const action = searchParams.get('action')
+    if (action === 'login')    return await handleLogin(request)
+    if (action === 'logout')   return await handleLogout(request)
+    if (action === 'register') return await handleRegister(request)
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
+  } catch (err) {
+    return serverError(err)
+  }
 }
 
 export async function GET(request) {
-  // GET /api/auth — return current session user
-  const { user, error } = await requireAuth(request)
-  if (error) return error
+  try {
+    const { user, error } = await requireAuth(request)
+    if (error) return error
 
-  const result = await query(
-    `SELECT id, username, email, role, first_name, last_name, pronouns,
-            department, job_title, hire_date, bio, phone,
-            font_size_pref, color_theme, reduce_motion, screen_reader_mode,
-            tech_comfort_level, preferred_language, is_active, manager_id
-     FROM users WHERE id = $1 AND is_active = TRUE`,
-    [user.sub]
-  )
-  if (!result.rows.length) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const rows = await query(
+      `SELECT id, username, email, role, first_name, last_name, pronouns,
+              department, job_title, hire_date, bio, phone,
+              font_size_pref, color_theme, reduce_motion, screen_reader_mode,
+              tech_comfort_level, preferred_language, is_active, manager_id
+       FROM users WHERE id = $1 AND is_active = TRUE`,
+      [user.sub]
+    )
+    if (!rows.length) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    return NextResponse.json({ user: rows[0] })
+  } catch (err) {
+    return serverError(err)
   }
-  return NextResponse.json({ user: result.rows[0] })
 }
 
 async function handleLogin(request) {
@@ -42,7 +50,7 @@ async function handleLogin(request) {
     return NextResponse.json({ error: 'Username and password required' }, { status: 400 })
   }
 
-  const result = await query(
+  const rows = await query(
     `SELECT id, username, email, role, first_name, last_name, pronouns,
             department, job_title, hire_date, bio, phone,
             font_size_pref, color_theme, reduce_motion, screen_reader_mode,
@@ -51,7 +59,7 @@ async function handleLogin(request) {
     [username]
   )
 
-  const user = result.rows[0]
+  const user = rows[0]
   if (!user || !user.is_active) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }
@@ -61,12 +69,7 @@ async function handleLogin(request) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }
 
-  const token = await signToken({
-    sub: user.id,
-    role: user.role,
-    username: user.username,
-  })
-
+  const token = await signToken({ sub: user.id, role: user.role, username: user.username })
   const { password_hash, ...safeUser } = user
   const response = NextResponse.json({ user: safeUser })
   return setAuthCookie(response, token)
@@ -89,15 +92,14 @@ async function handleRegister(request) {
   }
 
   const hash = await bcrypt.hash(password, 12)
-
   try {
-    const result = await query(
+    const rows = await query(
       `INSERT INTO users (id, username, email, password_hash, first_name, last_name, role)
        VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6)
        RETURNING id, username, email, role, first_name, last_name`,
       [username, email, hash, first_name, last_name, role]
     )
-    return NextResponse.json({ user: result.rows[0] }, { status: 201 })
+    return NextResponse.json({ user: rows[0] }, { status: 201 })
   } catch (err) {
     if (err.code === '23505') {
       return NextResponse.json({ error: 'Username or email already exists' }, { status: 409 })
