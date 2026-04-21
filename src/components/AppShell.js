@@ -34,6 +34,9 @@ export default function AppShell({ children }) {
             <span style={{ fontSize: '0.7em', opacity: 0.6, fontFamily: 'var(--font-body)' }}>
               HR Portal
             </span>
+            <div style={{ fontSize: '0.55em', opacity: 0.5, fontFamily: 'var(--font-body)', marginTop: '0.3rem', fontWeight: 500, letterSpacing: '0.02em' }}>
+              Eric Weitzman &middot; CPS3500
+            </div>
           </div>
           <div className="sidebar-section">Menu</div>
           {links.map(link => (
